@@ -8,10 +8,11 @@ This repository contains tools for PDF analysis and OpenAI interaction.
 
 - **Cadence control**: one request every 4 seconds by default (15/minute).
 - **Parallelism**: up to 15 concurrent chunks processed simultaneously.
-- **Retry strategy**: exponential backoff on HTTP 429 or other errors with up to three retries.
+- **Retry strategy**: exponential backoff on HTTP 429 or other errors with up to three retries. Retries bypass the regular 4&nbsp;s cadence so they are attempted as soon as the backoff expires.
+- **Verbose logging**: each send, success and retry is logged for traceability.
 - **Metrics and alerts**: logs latency, token usage and warns if more than 10% of chunks hit 429 or exceed 6 s latency.
 - **Graceful shutdown**: stops new submissions on `SIGINT`/`SIGTERM` and waits for running tasks.
-- **Progress tracking**: progress is stored in a file so the pipeline can resume without reprocessing completed chunks.
+- **Progress tracking**: progress is stored in a file so the pipeline can resume without reprocessing completed chunks. Simply keep the progress file when restarting to skip already processed lines.
 
 ### Usage
 

@@ -79,7 +79,9 @@ class OpenAIScheduler:
         retries = 0
         while retries <= self.config.max_retries and not self._stop.is_set():
             try:
-                await self._rate_limit()
+                if retries == 0:
+                    await self._rate_limit()
+                self.logger.info("Sending chunk %s attempt %s", index, retries + 1)
                 start = time.monotonic()
                 response = await self._send_request(chunk)
                 latency = time.monotonic() - start
@@ -87,6 +89,12 @@ class OpenAIScheduler:
                     self.stats["latency_over_6s"] += 1
                 usage = getattr(response, "usage", {}).get("total_tokens", 0)
                 self.stats["token_usage"] += usage
+                self.logger.info(
+                    "Chunk %s succeeded in %.2fs using %s tokens",
+                    index,
+                    latency,
+                    usage,
+                )
                 self.result_handler(index, response)
                 self._save_progress(index + 1)
                 return
@@ -99,7 +107,9 @@ class OpenAIScheduler:
                         self.logger.error("Chunk %s failed with 429 after retries", index)
                         break
                     backoff = self.config.backoff_start * (2 ** retries)
-                    self.logger.warning("429 on chunk %s, retry in %.1fs", index, backoff)
+                    self.logger.warning(
+                        "429 on chunk %s, retry in %.1fs", index, backoff
+                    )
                     await asyncio.sleep(backoff)
                     retries += 1
                 else:
@@ -107,7 +117,9 @@ class OpenAIScheduler:
                         self.logger.error("Chunk %s failed: %s", index, exc)
                         break
                     backoff = self.config.backoff_start * (2 ** retries)
-                    self.logger.warning("Error on chunk %s, retry in %.1fs", index, backoff)
+                    self.logger.warning(
+                        "Error on chunk %s, retry in %.1fs (%s)", index, backoff, exc
+                    )
                     await asyncio.sleep(backoff)
                     retries += 1
         self.logger.error("Abandon chunk %s", index)
