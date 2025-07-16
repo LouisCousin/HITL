@@ -43,7 +43,14 @@ streamlit run pdf_analyzer.py
 
 ## Scheduler Streamlit UI
 
-`scheduler_streamlit.py` exposes `openai_scheduler.py` through a simple Streamlit interface. You can upload a text file of chunks or paste text, set your API key and scheduling parameters, and monitor progress directly in the browser.
+`scheduler_streamlit.py` exposes `openai_scheduler.py` through a simple Streamlit interface. You can upload a text file of chunks or paste text, set your API key and fine‑tune the scheduling parameters directly in the sidebar.
+
+Available UI settings:
+
+- **Concurrence max** – number of chunks processed in parallel (default **15**)
+- **Intervalle entre envois** – delay between requests in seconds (default **4 s**)
+- **Backoff initial** – initial retry delay after an error (default **1 s**)
+- **Nombre de retries** – maximum number of retry attempts (default **3**)
 
 Run it with:
 ```bash
