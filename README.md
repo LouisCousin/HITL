@@ -31,3 +31,21 @@ Optional parameters:
 - `--progress` path to the progress file (default `progress.txt`)
 
 Results for each chunk are saved as `result_<index>.json`. To restart the pipeline without repeating finished chunks, keep the progress file.
+
+## PDF Analyzer (Streamlit)
+
+`pdf_analyzer.py` is a Streamlit application for extracting structured information from PDF files using OpenAI models. It supports chunking, APA reference extraction and Excel export.
+
+Run it with:
+```bash
+streamlit run pdf_analyzer.py
+```
+
+## Scheduler Streamlit UI
+
+`scheduler_streamlit.py` exposes `openai_scheduler.py` through a simple Streamlit interface. You can upload a text file of chunks or paste text, set your API key and scheduling parameters, and monitor progress directly in the browser.
+
+Run it with:
+```bash
+streamlit run scheduler_streamlit.py
+```
