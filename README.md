@@ -29,6 +29,12 @@ Optional parameters:
 - `--backoff` initial backoff delay in seconds (default 1)
 - `--retries` number of retries (default 3)
 - `--progress` path to the progress file (default `progress.txt`)
+- `--model` model name to use (default `gpt-3.5-turbo`)
+- `--temperature` sampling temperature (default 1.0)
+- `--top-p` nucleus sampling value (default 1.0)
+- `--presence-penalty` presence penalty (default 0.0)
+- `--frequency-penalty` frequency penalty (default 0.0)
+- `--max-tokens` maximum tokens in the response
 
 Results for each chunk are saved as `result_<index>.json`. To restart the pipeline without repeating finished chunks, keep the progress file.
 
@@ -51,6 +57,11 @@ Available UI settings:
 - **Intervalle entre envois** – delay between requests in seconds (default **4 s**)
 - **Backoff initial** – initial retry delay after an error (default **1 s**)
 - **Nombre de retries** – maximum number of retry attempts (default **3**)
+- **Modèle** – model name (default **gpt-3.5-turbo**)
+- **Température** – sampling temperature
+- **Top P** – nucleus sampling value
+- **Presence penalty** and **Frequency penalty** – penalties for token usage
+- **Max tokens** – limit for the response length
 
 Run it with:
 ```bash

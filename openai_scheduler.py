@@ -21,6 +21,12 @@ class SchedulerConfig:
     max_retries: int = 3
     api_key: Optional[str] = None
     progress_file: Optional[Path] = None
+    model: str = "gpt-3.5-turbo"
+    temperature: float = 1.0
+    top_p: float = 1.0
+    presence_penalty: float = 0.0
+    frequency_penalty: float = 0.0
+    max_tokens: Optional[int] = None
 
 
 class OpenAIScheduler:
@@ -68,11 +74,18 @@ class OpenAIScheduler:
             await asyncio.sleep(0.1)
             return {"choices": [{"message": {"content": f"Echo: {chunk[:20]}"}}], "usage": {"total_tokens": len(chunk.split())}}
         else:
-            return await openai.ChatCompletion.acreate(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": chunk}],
-                api_key=self.config.api_key,
-            )
+            params = {
+                "model": self.config.model,
+                "messages": [{"role": "user", "content": chunk}],
+                "api_key": self.config.api_key,
+                "temperature": self.config.temperature,
+                "top_p": self.config.top_p,
+                "presence_penalty": self.config.presence_penalty,
+                "frequency_penalty": self.config.frequency_penalty,
+            }
+            if self.config.max_tokens is not None:
+                params["max_tokens"] = self.config.max_tokens
+            return await openai.ChatCompletion.acreate(**params)
 
     async def _process_chunk(self, index: int, chunk: str) -> None:
         self.stats["total"] += 1
@@ -173,6 +186,12 @@ if __name__ == "__main__":
     parser.add_argument("--backoff", type=float, default=1.0, help="Initial backoff for retries")
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--progress", type=Path, default=Path("progress.txt"))
+    parser.add_argument("--model", type=str, default="gpt-3.5-turbo")
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--top-p", type=float, default=1.0)
+    parser.add_argument("--presence-penalty", type=float, default=0.0)
+    parser.add_argument("--frequency-penalty", type=float, default=0.0)
+    parser.add_argument("--max-tokens", type=int)
 
     args = parser.parse_args()
 
@@ -188,6 +207,12 @@ if __name__ == "__main__":
         max_retries=args.retries,
         api_key=args.api_key,
         progress_file=args.progress,
+        model=args.model,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        presence_penalty=args.presence_penalty,
+        frequency_penalty=args.frequency_penalty,
+        max_tokens=args.max_tokens,
     )
 
     scheduler = OpenAIScheduler(config, default_handler)
