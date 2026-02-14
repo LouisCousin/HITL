@@ -75,7 +75,11 @@ if run:
         )
 
         scheduler = OpenAIScheduler(config, handler)
-        asyncio.run(scheduler.run(chunks))
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(scheduler.run(chunks))
+        finally:
+            loop.close()
         progress_bar.progress(1.0)
         st.success("Traitement terminé")
         st.json(results)

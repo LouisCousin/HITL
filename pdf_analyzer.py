@@ -80,12 +80,12 @@ class AnalysisResult:
     sub_id: str
     text: str
     page: int
-    context: str = None
-    source_pdf: str = None
-    batch_id: str = None
-    apa_reference: str = None
+    context: Optional[str] = None
+    source_pdf: Optional[str] = None
+    batch_id: Optional[str] = None
+    apa_reference: Optional[str] = None
     bibliography_entries: List[Dict] = field(default_factory=list)
-    text_with_reference: str = None
+    text_with_reference: Optional[str] = None
 
 @dataclass
 class PDFChunk:
@@ -94,7 +94,7 @@ class PDFChunk:
     end_page: int
     chunk_index: int
     total_chunks: int
-    overlap_content: str = None
+    overlap_content: Optional[str] = None
 
 @dataclass
 class BatchRequest:
@@ -474,10 +474,13 @@ class PDFAnalyzer:
             content = response.choices[0].message.content.strip()
             
             if content.startswith('```json'):
-                content = content[7:-3]
+                content = content[7:]
             elif content.startswith('```'):
-                content = content[3:-3]
-            
+                content = content[3:]
+            if content.rstrip().endswith('```'):
+                content = content.rstrip()[:-3]
+            content = content.strip()
+
             try:
                 parsed_json = json.loads(content)
                 return parsed_json
@@ -510,6 +513,7 @@ class PDFAnalyzer:
                 progress_callback(5, 100, "Upload du fichier batch...")
             
             file_obj = io.BytesIO(jsonl_content.encode('utf-8'))
+            file_obj.name = "batch_requests.jsonl"
             uploaded_file = client.files.create(
                 file=file_obj,
                 purpose="batch"
@@ -533,7 +537,7 @@ class PDFAnalyzer:
                 progress_callback(15, 100, f"Batch {batch_id} en attente de traitement...")
             
             max_wait_time = 24 * 3600
-            poll_interval = 60
+            poll_interval = 10
             elapsed_time = 0
             
             while elapsed_time < max_wait_time:
@@ -615,9 +619,12 @@ class PDFAnalyzer:
                         
                         content = content.strip()
                         if content.startswith('```json'):
-                            content = content[7:-3]
+                            content = content[7:]
                         elif content.startswith('```'):
-                            content = content[3:-3]
+                            content = content[3:]
+                        if content.rstrip().endswith('```'):
+                            content = content.rstrip()[:-3]
+                        content = content.strip()
                         
                         try:
                             parsed_content = json.loads(content)
@@ -989,7 +996,7 @@ def export_to_excel_with_complete_bibliography(results: List[AnalysisResult],
                     try:
                         if len(str(cell.value)) > max_length:
                             max_length = len(str(cell.value))
-                    except:
+                    except Exception:
                         pass
                 if column_letter in ['E', 'J']:
                     adjusted_width = min(max_length + 2, 150)
@@ -1032,7 +1039,7 @@ def main():
         if api_key_from_env:
             st.success("✅ Clé API chargée depuis .env")
             api_key = api_key_from_env
-            st.text("Clé API: " + api_key[:10] + "..." + api_key[-4:])
+            st.text("Clé API: " + api_key[:4] + "..." + api_key[-4:])
         else:
             st.warning("⚠️ Clé API non trouvée dans .env")
             api_key = st.text_input("Clé API manuelle", type="password", help="Votre clé API OpenAI")
@@ -1142,7 +1149,7 @@ def main():
                     st.session_state.editorial_plan = json.dumps(plan_content, indent=2, ensure_ascii=False)
                     st.session_state.current_json_name = plan_file.name
                     st.success("✅ Plan éditorial chargé")
-                except:
+                except Exception:
                     st.error("❌ Erreur JSON")
             
             if 'editorial_plan' not in st.session_state:
@@ -1153,7 +1160,7 @@ def main():
                             st.session_state.editorial_plan = f.read()
                         st.session_state.current_json_name = "plan.json"
                         st.success("✅ Plan par défaut chargé")
-                    except:
+                    except Exception:
                         st.session_state.editorial_plan = '{"plan": "Veuillez charger un plan éditorial"}'
                         st.session_state.current_json_name = "default.json"
                 else:
@@ -1226,7 +1233,8 @@ def main():
                         ["Compléter le fichier existant", "Créer un nouveau fichier"],
                         help="Compléter : ajouter au fichier existant | Nouveau : créer un fichier séparé"
                     )
-                
+                    st.session_state['_completion_mode'] = completion_mode
+
                 with col2:
                     if completion_mode == "Créer un nouveau fichier":
                         custom_filename = st.text_input(
@@ -1234,16 +1242,19 @@ def main():
                             placeholder="nouveau_analysis",
                             help="Laissez vide pour un nom automatique"
                         )
+                        st.session_state['_custom_filename'] = custom_filename
                     else:
                         st.info("💾 Sauvegarde automatique avant modification")
             else:
                 st.success("✅ Aucun fichier existant - nouveau fichier sera créé")
                 completion_mode = "Créer un nouveau fichier"
+                st.session_state['_completion_mode'] = completion_mode
                 custom_filename = st.text_input(
                     "Nom du fichier Excel (optionnel)",
                     placeholder="",
                     help="Laissez vide pour utiliser le nom automatique basé sur le JSON"
                 )
+                st.session_state['_custom_filename'] = custom_filename
         
         col1, col2 = st.columns(2)
         
@@ -1314,10 +1325,10 @@ def main():
             
             param_checks = []
             
-            if total_chunks_estimated > 50:
-                param_checks.append(("⚠️", f"Nombre de chunks élevé ({total_chunks_estimated}). Cela peut prendre du temps."))
-            elif total_chunks_estimated > 100:
+            if total_chunks_estimated > 100:
                 param_checks.append(("❌", f"Nombre de chunks très élevé ({total_chunks_estimated}). Considérez augmenter la taille des chunks."))
+            elif total_chunks_estimated > 50:
+                param_checks.append(("⚠️", f"Nombre de chunks élevé ({total_chunks_estimated}). Cela peut prendre du temps."))
             else:
                 param_checks.append(("✅", f"Nombre de chunks acceptable ({total_chunks_estimated})"))
             
@@ -1366,18 +1377,15 @@ def main():
             if can_analyze and json_name:
                 has_existing, existing_files = analyzer.file_manager.check_existing_file(json_name)
                 
-                if has_existing and 'completion_mode' in locals():
-                    if completion_mode == "Compléter le fichier existant":
-                        is_completion = True
-                        excel_filename = existing_files[0].name
-                        backup_path = analyzer.file_manager.create_backup(existing_files[0])
-                        add_log(f"Backup créé: {backup_path}")
-                        st.success(f"💾 Backup créé: {backup_path.name}")
-                    else:
-                        custom_name = locals().get('custom_filename', '')
-                        excel_filename = analyzer.file_manager.generate_excel_filename(json_name, custom_name)
+                completion_mode = st.session_state.get('_completion_mode')
+                custom_name = st.session_state.get('_custom_filename', '')
+                if has_existing and completion_mode == "Compléter le fichier existant":
+                    is_completion = True
+                    excel_filename = existing_files[0].name
+                    backup_path = analyzer.file_manager.create_backup(existing_files[0])
+                    add_log(f"Backup créé: {backup_path}")
+                    st.success(f"💾 Backup créé: {backup_path.name}")
                 else:
-                    custom_name = locals().get('custom_filename', '')
                     excel_filename = analyzer.file_manager.generate_excel_filename(json_name, custom_name)
             
             st.session_state.results = []
