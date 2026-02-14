@@ -47,6 +47,7 @@ class OpenAIScheduler:
             "latency_over_6s": 0,
             "token_usage": 0,
         }
+        self._completed = set()
         self.progress_index = self._load_progress()
 
     def _load_progress(self) -> int:
@@ -59,7 +60,12 @@ class OpenAIScheduler:
 
     def _save_progress(self, index: int) -> None:
         if self.config.progress_file:
-            self.config.progress_file.write_text(str(index))
+            self._completed.add(index)
+            # Only advance the progress marker to the highest contiguous completed index
+            progress = self.progress_index
+            while progress in self._completed:
+                progress += 1
+            self.config.progress_file.write_text(str(progress))
 
     async def _rate_limit(self) -> None:
         async with self._send_lock:
@@ -72,12 +78,20 @@ class OpenAIScheduler:
     async def _send_request(self, chunk: str) -> Any:
         if openai is None:
             await asyncio.sleep(0.1)
-            return {"choices": [{"message": {"content": f"Echo: {chunk[:20]}"}}], "usage": {"total_tokens": len(chunk.split())}}
+            # Return a mock object that mirrors the real API response structure
+            mock = type("Mock", (), {})()
+            mock_choice = type("Mock", (), {})()
+            mock_message = type("Mock", (), {"content": f"Echo: {chunk[:20]}"})()
+            mock_choice.message = mock_message
+            mock.choices = [mock_choice]
+            mock_usage = type("Mock", (), {"total_tokens": len(chunk.split())})()
+            mock.usage = mock_usage
+            return mock
         else:
+            client = openai.AsyncOpenAI(api_key=self.config.api_key)
             params = {
                 "model": self.config.model,
                 "messages": [{"role": "user", "content": chunk}],
-                "api_key": self.config.api_key,
                 "temperature": self.config.temperature,
                 "top_p": self.config.top_p,
                 "presence_penalty": self.config.presence_penalty,
@@ -85,7 +99,7 @@ class OpenAIScheduler:
             }
             if self.config.max_tokens is not None:
                 params["max_tokens"] = self.config.max_tokens
-            return await openai.ChatCompletion.acreate(**params)
+            return await client.chat.completions.create(**params)
 
     async def _process_chunk(self, index: int, chunk: str) -> None:
         self.stats["total"] += 1
@@ -100,7 +114,8 @@ class OpenAIScheduler:
                 latency = time.monotonic() - start
                 if latency > 6:
                     self.stats["latency_over_6s"] += 1
-                usage = getattr(response, "usage", {}).get("total_tokens", 0)
+                usage_obj = getattr(response, "usage", None)
+                usage = getattr(usage_obj, "total_tokens", 0) if usage_obj else 0
                 self.stats["token_usage"] += usage
                 self.logger.info(
                     "Chunk %s succeeded in %.2fs using %s tokens",
